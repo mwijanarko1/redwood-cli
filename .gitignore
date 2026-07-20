@@ -7,3 +7,4 @@ session.json
 .har/
 *.har
 /tmp/
+.pi-subagents/
