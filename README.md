@@ -108,7 +108,7 @@ Stores the session cookie string (and a timestamp). Written `0600` under a `0700
 
 ## Development
 
-Single file: [`redwood.mjs`](./redwood.mjs).
+Entry: [`redwood.mjs`](./redwood.mjs). Page parsers: [`formatters.mjs`](./formatters.mjs).
 
 ```bash
 node redwood.mjs people     # smoke-test a formatter

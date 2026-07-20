@@ -11,10 +11,14 @@
   },
   "files": [
     "redwood.mjs",
+    "formatters.mjs",
     "skills",
     "README.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
   "keywords": [
     "redwood",
     "redwood-founders",
