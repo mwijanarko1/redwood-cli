@@ -13,6 +13,7 @@
     "redwood.mjs",
     "formatters.mjs",
     "writes.mjs",
+    "cache.mjs",
     "skills",
     "README.md",
     "LICENSE"

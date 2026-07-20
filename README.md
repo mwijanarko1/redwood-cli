@@ -131,11 +131,14 @@ This is an unofficial client. It may break when the site redeploys (server actio
 
 ```
 ~/.config/redwood-cli/session.json
+~/.config/redwood-cli/cache/
 ```
 
-Stores the session cookie string (and a timestamp). Written `0600` under a `0700` config dir. Delete with `redwood logout`, or remove the file.
+`session.json` stores the session cookie string (and a timestamp). Written `0600` under a `0700` config dir. Delete with `redwood logout`, or remove the file.
 
-**Do not commit this file.** It is equivalent to being logged in.
+Successful authenticated page GETs are cached under `cache/` (also `0600` files) so read commands can fall back after sustained upstream HTTP 503s. Cache is private member HTML; it is cleared on logout/session clear. Cached pages are stale — never use them to verify writes. Write paths always require live data.
+
+**Do not commit these files.** The session is equivalent to being logged in.
 
 ## Security notes
 

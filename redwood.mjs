@@ -28,10 +28,12 @@ import {
   confirmMode,
   mimeFromPath,
 } from './writes.mjs'
+import { readCachedPage, writeCachedPage, clearPageCache } from './cache.mjs'
 
 const BASE = 'https://redwoodfounders.org'
 const STATE_DIR = join(homedir(), '.config', 'redwood-cli')
 const STATE = join(STATE_DIR, 'session.json')
+const CACHE_DIR = join(STATE_DIR, 'cache')
 const AUTH_COOKIE_RE = /sb-[\w-]+-auth-token=/
 
 // Action IDs are build hashes — may need refreshing after a site deploy.
@@ -119,6 +121,7 @@ function saveSession(s) {
 
 function clearSession() {
   saveSession({ cookies: '' })
+  clearPageCache(CACHE_DIR)
 }
 
 function hasSession() {
@@ -765,20 +768,51 @@ async function writeMenuLoop() {
   }
 }
 
-async function getPage(path) {
-  const session = loadSession()
+async function getPage(path, { allowCache = false } = {}) {
+  let session = loadSession()
   if (!session.cookies) throw new AuthError('not logged in')
-  const res = await fetch(BASE + path, {
-    headers: { accept: 'text/html', cookie: session.cookies },
-    redirect: 'manual',
-  })
-  const cookies = parseSetCookie(res, session.cookies)
-  if (cookies) saveSession({ ...session, cookies })
-  return {
-    status: res.status,
-    location: res.headers.get('location'),
-    html: await res.text(),
+  // ponytail: 503-only GET retries; cap Retry-After at 1s if upstream asks for minutes
+  const backoff = [250, 500, 1000]
+  let last
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(BASE + path, {
+      headers: { accept: 'text/html', cookie: session.cookies },
+      redirect: 'manual',
+    })
+    const cookies = parseSetCookie(res, session.cookies)
+    if (cookies) {
+      session = { ...session, cookies }
+      saveSession(session)
+    }
+    last = {
+      status: res.status,
+      location: res.headers.get('location'),
+      html: await res.text(),
+    }
+    if (res.status !== 503 || attempt === 3) break
+    const rawRa = res.headers.get('retry-after')
+    const ra = rawRa == null || rawRa === '' ? NaN : Number(rawRa)
+    const delay =
+      Number.isFinite(ra) && ra >= 0 ? Math.min(Math.floor(ra * 1000), 1000) : backoff[attempt]
+    await new Promise((r) => setTimeout(r, delay))
   }
+  if (last.status === 503) {
+    if (allowCache) {
+      const cached = readCachedPage(CACHE_DIR, path)
+      if (cached) {
+        const ts = new Date(cached.fetchedAt).toISOString()
+        console.error(
+          `Redwood Cloudflare Worker unavailable (HTTP 503); showing cached page from ${ts}`,
+        )
+        return { status: 200, location: null, html: cached.html, fromCache: true }
+      }
+    }
+    throw new Error('Redwood Cloudflare Worker unavailable (HTTP 503; no cached page)')
+  }
+  if (last.status >= 200 && last.status < 300) {
+    writeCachedPage(CACHE_DIR, path, last.html)
+  }
+  return last
 }
 
 function ensureAuthed(r) {
@@ -797,7 +831,7 @@ async function ensureLogin() {
 
 async function whoAmI() {
   try {
-    const prof = await getPage('/batch1/profile')
+    const prof = await getPage('/batch1/profile', { allowCache: true })
     ensureAuthed(prof)
     return profileName(prof.html)
   } catch {
@@ -807,7 +841,7 @@ async function whoAmI() {
 
 async function oneShot(path) {
   await ensureLogin()
-  const r = await getPage(path)
+  const r = await getPage(path, { allowCache: true })
   ensureAuthed(r)
   console.log(formatPage(path, r.html))
 }
@@ -882,7 +916,7 @@ async function showPage(item) {
   console.log(`\n  ${item.label}\n  ${'─'.repeat(Math.max(8, item.label.length))}\n`)
   process.stdout.write('  loading…')
   try {
-    const r = await getPage(item.path)
+    const r = await getPage(item.path, { allowCache: true })
     ensureAuthed(r)
     const text = formatPage(item.path, r.html)
     stdout.write('\r\x1b[K')
@@ -928,6 +962,8 @@ async function doLogin(email) {
       'login failed — server action id may be stale (see README: refreshing server action IDs)',
     )
   }
+  // Drop prior account's cached pages so a post-login 503 cannot revive them.
+  clearPageCache(CACHE_DIR)
   const who = await whoAmI()
   console.log(who ? `\n  welcome, ${who}\n` : '\n  logged in\n')
   return who
@@ -1069,7 +1105,7 @@ try {
     else {
       clearScreen()
       try {
-        const home = await getPage('/batch1')
+        const home = await getPage('/batch1', { allowCache: true })
         ensureAuthed(home)
         const who = await whoAmI()
         if (who) console.log(`\n  hi ${who}`)
