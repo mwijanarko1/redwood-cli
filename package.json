@@ -1,0 +1,28 @@
+{
+  "name": "redwood-cli",
+  "version": "1.0.0",
+  "description": "Terminal client for the Redwood Founders batch 1 board",
+  "type": "module",
+  "bin": {
+    "redwood": "./redwood.mjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "files": [
+    "redwood.mjs",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "redwood",
+    "redwood-founders",
+    "cli"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mwijanarko1/redwood-cli.git"
+  }
+}
