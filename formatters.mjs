@@ -153,7 +153,7 @@ function formatWelcome(html) {
   const lines = ['welcome', '']
   for (const p of paras) {
     if (!p || /whatsapp|luma|share on/i.test(p)) continue
-    if (p.length < 80 && !p.includes('\n')) lines.push(p)
+    if (p.length <= 72 && !p.includes('\n')) lines.push(p)
     else lines.push(...wrap(p.replace(/\n/g, ' '), 72), '')
   }
   const links = []
@@ -195,29 +195,38 @@ function formatActivity(html) {
     const shipBlock = sec.match(/uppercase">shipped<\/span>\s*<ul[^>]*>([\s\S]*?)<\/ul>/i)
     if (shipBlock) {
       lines.push('  shipped')
+      let shippedN = 0
       for (const li of shipBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)) {
         const name = li[1].match(/font-bold text-white lowercase">([^<]+)/)?.[1]
         const note = li[1].match(/text-sm text-white\/50">([^<]+)/)?.[1]
         const href = li[1].match(/href="([^"]+)"/)?.[1]
         const linkText = li[1].match(/href="[^"]+"[^>]*>([^<]+)/)?.[1]
         if (!name) continue
+        if (shippedN++) lines.push('')
         let extra = note ? unwrapComments(note) : ''
         const url = href && isUrl(href) ? href.replace(/^https?:\/\//, '') : ''
         const detail = url || (linkText && !isUrl(href) ? unwrapComments(linkText) : '')
-        lines.push(`    ${unwrapComments(name)}${extra ? ` — ${extra}` : ''}`)
-        if (detail) lines.push(`      ${detail}`)
+        const summary = `${unwrapComments(name)}${extra ? ` — ${extra}` : ''}`
+        lines.push(...wrap(summary, 68, '    '))
+        if (detail) {
+          // URLs stay one line (wrap only splits on spaces); non-URL detail wraps to ~72
+          if (url) lines.push(`      ${detail}`)
+          else lines.push(...wrap(detail, 66, '      '))
+        }
       }
     }
 
     const commitBlock = sec.match(/uppercase">committed<\/span>\s*<ul[^>]*>([\s\S]*?)<\/ul>/i)
     if (commitBlock) {
       lines.push('  committed')
+      let committedN = 0
       for (const li of commitBlock[1].matchAll(/<li[^>]*>([\s\S]*?)<\/li>/g)) {
         const who =
           li[1].match(/alt="([^"]+)"/)?.[1] ||
           li[1].match(/text-xs text-white\/45">([^<]+)/)?.[1]
         const text = li[1].match(/text-sm leading-snug text-white\/85">([^<]+)/)?.[1]
         if (!who && !text) continue
+        if (committedN++) lines.push('')
         lines.push(`    ${unwrapComments(who || '?')}`)
         if (text) lines.push(...wrap(unwrapComments(text), 66, '      '))
       }
@@ -297,7 +306,8 @@ function formatPeople(html) {
     lines.push(p.name)
     lines.push(`  team       ${p.team || '—'}`)
     if (p.blurb) {
-      const wrapped = wrap(p.blurb, 70)
+      // label/continuation are 13 cols; wrap content to 59 so displayed lines stay ~72
+      const wrapped = wrap(p.blurb, 59)
       wrapped.forEach((l, i) => lines.push(i === 0 ? `  blurb      ${l}` : `             ${l}`))
     }
     if (p.skills.length) lines.push(`  skills     ${p.skills.join(', ')}`)

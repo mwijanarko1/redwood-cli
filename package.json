@@ -12,6 +12,7 @@
   "files": [
     "redwood.mjs",
     "formatters.mjs",
+    "writes.mjs",
     "skills",
     "README.md",
     "LICENSE"
