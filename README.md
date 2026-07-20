@@ -9,7 +9,7 @@ $ redwood
   email: you@example.com
   password: ••••••••
 
-  welcome, Ada Lovelace
+  welcome, Zain Mobarik
 
   › home
     welcome
